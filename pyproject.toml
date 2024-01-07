@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "langchain-dd"
+version = "0.1.0"
+description = ""
+authors = ["Chris"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pypdf2 = "^3.0.1"
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.12.1"
+ipython = "^8.19.0"
+ipykernel = "^6.28.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
