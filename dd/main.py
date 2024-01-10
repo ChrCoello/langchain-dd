@@ -9,6 +9,7 @@ eval_interval = 300
 learning_rate = 1e-2
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 eval_iters = 200
+n_embed = 32
 # -----
 torch.manual_seed(4242)
 # -----
@@ -58,7 +59,7 @@ def estimate_loss():
     return out
 
 # Create a model    
-model = BigramLanguageModel(vocab_size)
+model = BigramLanguageModel(vocab_size=vocab_size, n_embed=n_embed, block_size=block_size, device=device)
 m = model.to(device)
 # create a PyTorch optimizer
 optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)

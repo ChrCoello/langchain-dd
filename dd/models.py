@@ -8,16 +8,23 @@ class BigramLanguageModel(nn.Module):
     next character given a previous character.
     """
 
-    def __init__(self, vocab_size):
+    def __init__(self, vocab_size, n_embed, block_size, device):
         super().__init__()
         # each token directly reads off the logits for the next token from a lookup table
-        self.token_embeddings_table = nn.Embedding(vocab_size, vocab_size)
+        self.token_embeddings_table = nn.Embedding(vocab_size, n_embed)
+        self.position_embeddings_table = nn.Embedding(block_size, n_embed)
+        self.lm_head = nn.Linear(n_embed,vocab_size)
+        self.device = device
 
     def forward(self, idx, targets=None):
 
         # idx.shape : (B, T)
+        B,T = idx.shape
         # logits.shape : (B, T, C) -> C is the embedding size
-        logits = self.token_embeddings_table(idx) # (B,T,C)
+        tok_emb = self.token_embeddings_table(idx) # (B,T,C)
+        pos_emb = self.position_embeddings_table(torch.arange(T, device=self.device)) # (T,C)
+        x = tok_emb + pos_emb
+        logits = self.lm_head(x) # (B,T,vocab_size)
 
         if targets is None:
             loss = None
