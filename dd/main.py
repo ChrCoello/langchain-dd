@@ -1,15 +1,14 @@
 import torch
 from models import BigramLanguageModel
 
-# hyperparameters
-batch_size = 32
-block_size = 8 # what is the maximum context length for predictions?
-max_iters = 3000
-eval_interval = 300
-learning_rate = 1e-2
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-eval_iters = 200
-n_embed = 32
+from hyperparam import (batch_size,
+    block_size,
+    max_iters,
+    eval_interval,
+    learning_rate,
+    device,
+    eval_iters)
+
 # -----
 torch.manual_seed(4242)
 # -----
@@ -59,7 +58,9 @@ def estimate_loss():
     return out
 
 # Create a model    
-model = BigramLanguageModel(vocab_size=vocab_size, n_embed=n_embed, block_size=block_size, device=device)
+model = BigramLanguageModel(
+    vocab_size=vocab_size
+    )
 m = model.to(device)
 # create a PyTorch optimizer
 optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
