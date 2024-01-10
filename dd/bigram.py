@@ -1,10 +1,9 @@
 import torch
-import torch.nn as nn
-from torch.nn import functional as F
+from models import BigramLanguageModel
 
 # hyperparameters
 batch_size = 32
-block_size = 8 # wha tis the maximum context length for predictions?
+block_size = 8 # what is the maximum context length for predictions?
 max_iters = 3000
 eval_interval = 300
 learning_rate = 1e-2
@@ -52,55 +51,13 @@ def estimate_loss():
         losses = torch.zeros(eval_iters)
         for k in range(eval_iters):
             X, Y = get_batch(split)
-            logits, loss = model(X, Y)
+            _, loss = model(X, Y)
             losses[k] = loss.item()
         out[split] = losses.mean()
     model.train()
     return out
-# Bigram language model
 
-class BigramLanguageModel(nn.Module):
-    """
-    Bigram Language Model 'neural net', simply a lookup table of logits for the
-    next character given a previous character.
-    """
-
-    def __init__(self, config):
-        super().__init__()
-        # each token directly reads off the logits for the next token from a lookup table
-        self.token_embeddings_table = nn.Embedding(vocab_size, vocab_size)
-
-    def forward(self, idx, targets=None):
-
-         # 'forward pass', lol
-        logits = self.token_embeddings_table(idx) # (B,T,C)
-
-        if targets is None:
-            loss = None
-        else:
-            B,T,C = logits.shape
-            logits = logits.view(B*T, C)
-            targets = targets.view(B*T)
-            loss = F.cross_entropy(logits, targets)
-
-        return logits, loss
-    
-    def generate(self, idx, max_new_tokens):
-        # idx is (B, T) array of indices in the current context
-        for _ in range(max_new_tokens):
-            # get the predictions
-            logits, loss = self(idx)
-            # focus only on the last time step
-            logits = logits[:, -1, :] # becomes (B, C)
-            # apply softmax to get probabilities
-            probs = F.softmax(logits, dim=-1) # (B, C)
-            # sample from the distribution
-            idx_next = torch.multinomial(probs, num_samples=1) # (B, 1)
-            # append sampled index to the running sequence
-            idx = torch.cat((idx, idx_next), dim=1) # (B, T+1)
-        return idx
-
-#create a model    
+# Create a model    
 model = BigramLanguageModel(vocab_size)
 m = model.to(device)
 # create a PyTorch optimizer
