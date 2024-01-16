@@ -1,4 +1,6 @@
 import torch
+import regex
+from pathlib import Path
 from models import BigramLanguageModel
 
 from hyperparam import (batch_size,
@@ -11,16 +13,22 @@ from hyperparam import (batch_size,
 
 # -----
 torch.manual_seed(4242)
+list_of_documents = ['dmg.md']
 # -----
-with open('data/dmg.md', 'r', encoding='utf-8') as f:
-    text = f.read()
+text = ''
+for doc in list_of_documents:
+    with open(Path('data') / doc, 'r', encoding='utf-8') as f:
+        doc_txt = f.read()
+    text = text + '\n' + doc_txt
 # -----
-chars = sorted(list(set(text)))
-vocab_size = len(chars)
+pat = regex.compile(r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+""")
+list_tokens = regex.findall(pat, text)
+tokens = sorted(list(set(list_tokens)))
+vocab_size = len(tokens)
 # -----
 # create a mapping from characters to integers and vice versa
-stoi = {ch: i for i, ch in enumerate(chars)}
-itos = {i: ch for i, ch in enumerate(chars)}
+stoi = {ch: i for i, ch in enumerate(tokens)}
+itos = {i: ch for i, ch in enumerate(tokens)}
 # -----
 encode = lambda s: [stoi[c] for c in s] # encoder: take a string, output a list of integers
 decode = lambda l: ''.join([itos[i] for i in l]) # decoder: take a list of integers, output a string
@@ -83,3 +91,6 @@ for iter in range(max_iters):
 # generate from the model
 context = torch.zeros((1, 1), dtype=torch.long, device=device)
 print(decode(m.generate(context, max_new_tokens=500)[0].tolist()))
+
+# Save the model
+torch.save(obj=m, f=Path('model')/'model.pt')

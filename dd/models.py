@@ -6,7 +6,9 @@ from hyperparam import (
     block_size,
     device,
     n_embed,
-    num_heads)
+    num_heads,
+    dropout,
+    n_layer)
 
 class Head(nn.Module):
     """one head of self-attention"""
@@ -17,6 +19,7 @@ class Head(nn.Module):
      self.query = nn.Linear(n_embed, head_size, bias=False)
      self.value = nn.Linear(n_embed, head_size, bias=False)
      self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
+     self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
      B,T,C = x.shape
@@ -26,6 +29,7 @@ class Head(nn.Module):
      wei = q @ k.transpose(-2,-1) * C**-0.5 # (B,T,C) @ (B,C,T) -> (B,T,T)
      wei = wei.masked_fill(self.tril[:T,:T] == 0, float('-inf')) # (B,T,T)
      wei = F.softmax(wei, dim=-1) # (B,T,T)
+     wei = self.dropout(wei)
      v = self.value(x) # (B,T,C)
      out = wei @ v # (B,T,T) @ (B,T,C) -> (B,T,C)
      return out
@@ -37,19 +41,20 @@ class MultiHeadAttention(nn.Module):
         super().__init__()
         self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
         self.proj = nn.Linear(n_embed, n_embed)
+        self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
         out = torch.cat([h(x) for h in self.heads], dim=-1)
-        out = self.proj(out)
+        out = self.dropout(self.proj(out))
         return out
 
 
 class LayerNorm1d: # (used to be BatchNorm1d)
   
-    def __init__(self, dim, eps=1e-5, momentum=0.1):
+    def __init__(self, dim, eps=1e-3):
         self.eps = eps
-        self.gamma = torch.ones(dim)
-        self.beta = torch.zeros(dim)
+        self.gamma = torch.ones(dim).to(device)
+        self.beta = torch.zeros(dim).to(device)
   
     def __call__(self, x):
         # calculate the forward pass
@@ -73,6 +78,7 @@ class FeedForward(nn.Module):
             nn.Linear(n_embed, 4*n_embed),
             nn.ReLU(),
             nn.Linear(4*n_embed, n_embed),
+            nn.Dropout(dropout)
         )
 
     def forward(self, x):
@@ -89,12 +95,12 @@ class Block(nn.Module):
         head_size = n_embed // n_head
         self.sa = MultiHeadAttention(num_heads=n_head, head_size=head_size)
         self.ffwd = FeedForward(n_embed=n_embed)
-        # self.ln1 = LayerNorm1d(n_embed)
-        # self.ln2 = LayerNorm1d(n_embed)
+        self.ln1 = nn.LayerNorm(n_embed)
+        self.ln2 = nn.LayerNorm(n_embed)
 
     def forward(self, x):
-        x = x + self.sa(x)
-        x = x + self.ffwd(x)
+        x = x + self.sa(self.ln1(x))
+        x = x + self.ffwd(self.ln2(x))
         return x
 
 
@@ -110,13 +116,8 @@ class BigramLanguageModel(nn.Module):
         # each token directly reads off the logits for the next token from a lookup table
         self.token_embeddings_table = nn.Embedding(num_embeddings=vocab_size, embedding_dim=n_embed)
         self.position_embeddings_table = nn.Embedding(num_embeddings=block_size, embedding_dim=n_embed)
-        self.blocks = nn.Sequential(
-                Block(n_embed=n_embed, n_head=num_heads),
-                Block(n_embed=n_embed, n_head=num_heads),
-                Block(n_embed=n_embed, n_head=num_heads)
-        )
-        # self.sa_heads = MultiHeadAttention(num_heads=num_heads, head_size=head_size)
-        # self.ffwd = FeedForward(n_embed)
+        self.blocks = nn.Sequential(*[Block(n_embed=n_embed, n_head=num_heads) for _ in range(n_layer)])
+        self.ln_f = nn.LayerNorm(n_embed) # final layer norm
         self.lm_head = nn.Linear(in_features=n_embed,out_features=vocab_size)
 
     def forward(self, idx, targets=None):
@@ -128,6 +129,7 @@ class BigramLanguageModel(nn.Module):
         pos_emb = self.position_embeddings_table(torch.arange(T, device=device)) # (T,C)
         x = tok_emb + pos_emb
         x = self.blocks(x) # apply blocks of multi-head self-attention / feed-forward network (B,T,C)
+        x = self.ln_f(x) # (B,T,C)
         logits = self.lm_head(x) # (B,T,vocab_size)
 
         if targets is None:
