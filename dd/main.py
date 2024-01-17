@@ -19,12 +19,16 @@ text = ''
 for doc in list_of_documents:
     with open(Path('data') / doc, 'r', encoding='utf-8') as f:
         doc_txt = f.read()
-    text = text + '\n' + doc_txt
+    text = doc_txt
 # -----
-pat = regex.compile(r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+""")
-list_tokens = regex.findall(pat, text)
+# tokenization
+#pat = regex.compile(r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+""")
+#list_tokens = regex.findall(pat, text)
+list_tokens = text
+# -----
 tokens = sorted(list(set(list_tokens)))
 vocab_size = len(tokens)
+print(f"vocabulary size: {vocab_size}")
 # -----
 # create a mapping from characters to integers and vice versa
 stoi = {ch: i for i, ch in enumerate(tokens)}
